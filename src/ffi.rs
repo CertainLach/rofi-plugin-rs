@@ -6,11 +6,14 @@ use std::{
 use crate::{
 	action::SelectData,
 	action::{ActionResult, UserAction},
+	mode::Icon,
 	mode::Mode,
 };
 
 extern "C" {
 	fn helper_token_match(tokens: *const RofiIntMatcher, input: *const c_char) -> i32;
+	fn rofi_icon_fetcher_query(name: *const c_char, size: i32) -> u32;
+	fn rofi_icon_fetcher_get(uid: u32) -> *const ();
 }
 
 #[repr(i32)]
@@ -84,7 +87,7 @@ pub struct FfiMode<T: Default + Mode> {
 	pub result: extern "C" fn(&Self, i32, *const *const c_char, u32) -> ModeMode,
 	pub token_match: unsafe extern "C" fn(&Self, *const RofiIntMatcher, u32) -> i32,
 	pub display_name: extern "C" fn(&Self, u32, &mut i32, usize, i32) -> *const c_char,
-	pub get_icon: Option<extern "C" fn(&Self, u32, i32) -> usize>,
+	pub get_icon: extern "C" fn(&Self, u32, i32) -> *const (),
 	pub get_completion: Option<extern "C" fn(&Self, u32) -> *mut c_char>,
 	pub preprocess: unsafe extern "C" fn(&Self, *const c_char) -> *const c_char,
 	pub message: extern "C" fn(&Self) -> *const c_char,
@@ -116,6 +119,19 @@ impl<T: Mode + Default> FfiMode<T> {
 
 	pub extern "C" fn num_entries(&self) -> u32 {
 		self.data().len().try_into().expect("u32 limit")
+	}
+	pub extern "C" fn get_icon(&self, line: u32, size: i32) -> *const () {
+		let data = self.data();
+		let icon = data.icon(line as usize, size as u32);
+		match icon {
+			Some(Icon::Named(name)) => {
+				let uid = unsafe {
+					rofi_icon_fetcher_query(CString::new(&name as &str).unwrap().into_raw(), size)
+				};
+				unsafe { rofi_icon_fetcher_get(uid) }
+			}
+			None => null(),
+		}
 	}
 	pub extern "C" fn display_name(
 		&self,

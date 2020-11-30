@@ -2,6 +2,10 @@ use log::info;
 
 use crate::action::{ActionResult, UserAction};
 
+pub enum Icon {
+	Named(String),
+}
+
 /// Rust native implementation of rofi_mode
 pub trait Mode: Default {
 	/// Returns count of results
@@ -12,6 +16,9 @@ pub trait Mode: Default {
 
 	/// Returns readable name for line by number
 	fn name(&self, line: usize) -> &str;
+
+	/// Returns icon for line by number
+	fn icon(&self, line: usize, size: u32) -> Option<&Icon>;
 
 	/// Handles user actions
 	fn action(&mut self, action: UserAction) -> ActionResult;
